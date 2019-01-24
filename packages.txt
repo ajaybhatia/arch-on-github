@@ -1,4 +1,3 @@
-acroread
 anydesk
 auryo-bin
 cloudcross
