@@ -1,7 +1,5 @@
 anydesk
 auryo-bin
-cloudcross
-disable-tracker
 flutter
 freeoffice
 genymotion
