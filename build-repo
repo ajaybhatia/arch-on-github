@@ -1,0 +1,74 @@
+#!/bin/sh -ex
+
+export PKGDEST="$(pwd)/build/packages"
+export SRCDEST="$(pwd)/build/sources"
+
+main() {
+  while read -r package; do
+    build_package "${package}"
+  done < packages.txt
+
+  build_repo "$1"
+}
+
+build_package() {
+  local package="$1"
+
+  if [ -d "build/snapshots/${package}" ]; then
+    echo "Already built package ${package}, skipping..."
+    return
+  fi
+
+  mkdir -p "build/snapshots"
+  curl "https://aur.archlinux.org/cgit/aur.git/snapshot/${package}.tar.gz" \
+    | tar --extract --gzip --verbose --directory='build/snapshots'
+
+  for pgp_key in $(get_pgp_keys "${package}"); do
+    gpg --recv-keys "${pgp_key}"
+  done
+
+  for dependency in $(get_dependencies "${package}"); do
+    if ! package_in_official_repo "$dependency"; then
+      build_package "${dependency}"
+    fi
+  done
+
+  mkdir -p \
+    "${PKGDEST}" \
+    "${SRCDEST}"
+  (cd "build/snapshots/${package}" &&
+    makepkg \
+      --clean \
+      --force \
+      --noconfirm \
+      --syncdeps)
+}
+
+# TODO: Remove versions (e.g. X>=Y)
+get_dependencies() {
+  local package="$1"
+  (cd "build/snapshots/${package}" &&
+    bash -c 'source PKGBUILD && echo ${depends[@]} ${makedepends[@]}') \
+    | sed --regexp-extended 's/>[^ ]+//g'
+}
+
+package_in_official_repo() {
+  local package="$1"
+  pacman --sync --search "^${package}$" > /dev/null
+}
+
+get_pgp_keys() {
+  local package="$1"
+  (cd "build/snapshots/${package}" &&
+    bash -c 'source PKGBUILD && echo ${validpgpkeys[@]}')
+}
+
+build_repo() {
+  local repository=$1
+  mkdir -p build/repo
+  repo-add --new --remove \
+    "build/repo/${repository}.db.tar.xz" \
+    build/packages/*
+}
+
+main "$@"

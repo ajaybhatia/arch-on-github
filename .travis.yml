@@ -1,0 +1,30 @@
+language: generic
+
+services:
+  - docker
+sudo: required
+
+before_script:
+  - make build-image
+
+script:
+  - make
+
+before_deploy:
+  - git config --local user.name "Ajay Bhatia"
+  - git config --local user.email "prof.ajaybhatia@gmail.com"
+
+  - git tag -d $(git tag)
+  # Delete the (previous) latest release, since Travis will not update the packages otherwise.
+  - make delete-latest
+
+  - git tag latest
+
+deploy:
+  provider: releases
+  api_key: $GITHUB_TOKEN
+  file: repo/*
+  file_glob: true
+  skip_cleanup: true
+  on:
+    repo: ajaybhatia/arch-on-github

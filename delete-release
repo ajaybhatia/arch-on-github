@@ -1,0 +1,46 @@
+#!/bin/sh -ex
+
+# Deletes a GitHub release using a tag.
+
+API=https://api.github.com
+
+main() {
+  local tag="$1"
+  local release_url
+  release_url="$(get_release_url "${tag}")"
+  echo "release url is ${release_url}."
+  if [ "${release_url}" != 'null' ]; then
+    delete_release "${release_url}"
+  fi
+  delete_remote_tag "${tag}"
+}
+
+get_release_url() {
+  local tag="$1"
+  curl \
+    -H "Authorization: token ${GITHUB_TOKEN}" \
+    "${API}/repos/ajaybhatia/arch-on-github/releases/tags/${tag}" \
+  | jq --raw-output '.url'
+}
+
+delete_release() {
+  local release_url="$1"
+  curl \
+    -X DELETE \
+    -H "Authorization: token ${GITHUB_TOKEN}" \
+    "${release_url}"
+}
+
+delete_remote_tag() {
+  local tag="$1"
+  curl \
+    -X DELETE \
+    -H "Authorization: token ${GITHUB_TOKEN}" \
+    "${API}/repos/ajaybhatia/arch-on-github/git/refs/tags/${tag}"
+}
+
+if [ -z "${GITHUB_TOKEN}" ]; then
+  echo 'Environment variable GITHUB_TOKEN is empty.'
+fi
+
+main "$@"
